@@ -1,26 +1,40 @@
 import * as alertService from '../services/alert.service.js';
-import supabase from '../utils/supabaseClient.js';
+import pool from '../utils/db.js';
 
 export const getAlerts = async (req, res) => {
     try {
         const { sector, severity, status } = req.query;
 
-        let query = supabase.from('alerts').select('*').order('created_at', { ascending: false });
+        let queryText = 'SELECT * FROM alerts';
+        let conditions = [];
+        let values = [];
 
         // Sector Scoping: SECTOR_OWNERs only see their assigned sector
         if (req.user.role === 'SECTOR_OWNER' && req.user.sector) {
-            query = query.eq('sector', req.user.sector);
+            conditions.push(`sector = $${values.length + 1}`);
+            values.push(req.user.sector);
         } else if (sector) {
-            query = query.eq('sector', sector);
+            conditions.push(`sector = $${values.length + 1}`);
+            values.push(sector);
         }
 
-        if (severity) query = query.eq('severity', severity);
-        if (status) query = query.eq('status', status);
+        if (severity) {
+            conditions.push(`severity = $${values.length + 1}`);
+            values.push(severity);
+        }
+        if (status) {
+            conditions.push(`status = $${values.length + 1}`);
+            values.push(status);
+        }
 
-        const { data, error } = await query;
+        if (conditions.length > 0) {
+            queryText += ' WHERE ' + conditions.join(' AND ');
+        }
 
-        if (error) throw error;
-        res.json({ success: true, alerts: data });
+        queryText += ' ORDER BY created_at DESC';
+
+        const { rows } = await pool.query(queryText, values);
+        res.json({ success: true, alerts: rows });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -29,10 +43,11 @@ export const getAlerts = async (req, res) => {
 export const getAlertById = async (req, res) => {
     try {
         const { id } = req.params;
-        const { data, error } = await supabase.from('alerts').select('*').eq('id', id).single();
+        const { rows } = await pool.query('SELECT * FROM alerts WHERE id = $1', [id]);
+        const alert = rows[0];
 
-        if (error) throw error;
-        res.json({ success: true, alert: data });
+        if (!alert) return res.status(404).json({ success: false, message: 'Alert not found' });
+        res.json({ success: true, alert });
     } catch (error) {
         res.status(404).json({ success: false, message: 'Alert not found' });
     }
@@ -50,3 +65,4 @@ export const resolveAlert = async (req, res) => {
         res.status(500).json({ success: false, message: result.error });
     }
 };
+

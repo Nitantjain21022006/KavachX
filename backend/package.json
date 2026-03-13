@@ -9,7 +9,7 @@
     "dev": "nodemon src/index.js"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.38.4",
+    "pg": "^8.11.3",
     "axios": "^1.6.2",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.6",

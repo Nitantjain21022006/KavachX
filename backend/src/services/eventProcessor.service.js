@@ -1,5 +1,5 @@
 import redisClient from '../utils/redisClient.js';
-import supabase from '../utils/supabaseClient.js';
+import pool from '../utils/db.js';
 import { analyzeMetrics } from '../utils/mlClient.js';
 import { createAlert } from './alert.service.js';
 
@@ -11,25 +11,24 @@ export const processEvent = async (event) => {
     const ip = metadata?.ip || '127.0.0.1';
 
     try {
-        console.log(`[Processor] Step 1: Storing event in Supabase...`);
-        const { data, error } = await supabase
-            .from('events')
-            .insert([
-                {
-                    sector,
-                    type,
-                    severity: eventSeverity.toUpperCase(),
-                    metadata,
-                    created_at: isoTimestamp
-                }
-            ])
-            .select();
+        console.log(`[Processor] Step 1: Storing event in PostgreSQL...`);
+        const insertEventQuery = `
+            INSERT INTO events (sector, type, severity, metadata, created_at)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING *
+        `;
+        const eventValues = [
+            sector,
+            type,
+            eventSeverity.toUpperCase(),
+            JSON.stringify(metadata),
+            isoTimestamp
+        ];
 
-        if (error) {
-            console.error('[Processor] Supabase Event Insert Error:', error);
-            throw error;
-        }
-        console.log(`[Processor] Event stored successfully with ID: ${data?.[0]?.id}`);
+        const { rows: eventRows } = await pool.query(insertEventQuery, eventValues);
+        const storedEvent = eventRows[0];
+
+        console.log(`[Processor] Event stored successfully with ID: ${storedEvent?.id}`);
 
         // 2. Update Redis Tracking
         const windowKey = `window:events:${sector}`;
@@ -40,7 +39,7 @@ export const processEvent = async (event) => {
             severity: eventSeverity,
             ip,
             timestamp,
-            eventId: data?.[0]?.id
+            eventId: storedEvent?.id
         };
 
         try {
@@ -176,10 +175,10 @@ export const processEvent = async (event) => {
             }
         }
 
-        console.log(`[Processor] SUCCESS: Pipeline complete for event ID: ${data?.[0]?.id || 'N/A'}`);
+        console.log(`[Processor] SUCCESS: Pipeline complete for event ID: ${storedEvent?.id || 'N/A'}`);
         return {
             success: true,
-            eventId: data?.[0]?.id || null,
+            eventId: storedEvent?.id || null,
             analysis: analysis || null,
             metrics: highFidelityMetrics || null
         };

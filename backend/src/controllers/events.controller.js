@@ -1,5 +1,5 @@
 import * as eventProcessor from '../services/eventProcessor.service.js';
-import supabase from '../utils/supabaseClient.js';
+import pool from '../utils/db.js';
 
 export const ingestEvent = async (req, res) => {
     const { sector, type, severity, metadata } = req.body;
@@ -38,16 +38,18 @@ export const ingestEvent = async (req, res) => {
 
 export const getEventStats = async (req, res) => {
     try {
-        // Fetch last 24h count from Supabase
-        const { count, error } = await supabase
-            .from('events')
-            .select('*', { count: 'exact', head: true })
-            .gt('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+        const queryText = `
+            SELECT COUNT(*) FROM events 
+            WHERE created_at > $1
+        `;
+        const values = [new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()];
 
-        if (error) throw error;
+        const { rows } = await pool.query(queryText, values);
+        const count = parseInt(rows[0].count, 10);
 
         res.json({ success: true, count });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
 };
+

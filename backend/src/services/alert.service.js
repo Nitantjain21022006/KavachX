@@ -1,24 +1,28 @@
-import supabase from '../utils/supabaseClient.js';
+import pool from '../utils/db.js';
 import { sendAlertEmail } from '../utils/mailer.js';
 
 // Auto-resolve function that can be called after a delay
 const autoResolveAlert = async (alertId, severity) => {
     try {
-        const { data, error } = await supabase
-            .from('alerts')
-            .update({
-                status: 'RESOLVED',
-                resolution_type: 'AUTOMATED',
-                resolved_at: new Date().toISOString(),
-                resolution_notes: `Auto-resolved by system: ${severity} severity alerts are automatically mitigated after a short delay.`
-            })
-            .eq('id', alertId)
-            .eq('status', 'ACTIVE') // Only resolve if still ACTIVE (not manually resolved)
-            .select();
+        const queryText = `
+            UPDATE alerts
+            SET 
+                status = 'RESOLVED',
+                resolution_type = 'AUTOMATED',
+                resolved_at = $1,
+                resolution_notes = $2
+            WHERE id = $3 AND status = 'ACTIVE'
+            RETURNING *
+        `;
+        const values = [
+            new Date().toISOString(),
+            `Auto-resolved by system: ${severity} severity alerts are automatically mitigated after a short delay.`,
+            alertId
+        ];
 
-        if (error) throw error;
+        const { rows } = await pool.query(queryText, values);
         
-        if (data && data.length > 0) {
+        if (rows.length > 0) {
             console.log(`[Alert Service] Auto-resolved ${severity} severity alert: ${alertId} after delay`);
         }
     } catch (error) {
@@ -32,34 +36,28 @@ export const createAlert = async (alertData) => {
     const normalizedSeverity = severity === null ? null : (severity?.toUpperCase() || 'LOW');
 
     try {
-        // All alerts start as ACTIVE (LIVE_THREAT) so they appear in dashboard
-        const insertData = {
+        const queryText = `
+            INSERT INTO alerts (sector, type, severity, score, explanation, metadata, status, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING *
+        `;
+        const values = [
             sector,
             type,
-            severity: normalizedSeverity, // Can be NULL for Normal attack type
+            normalizedSeverity,
             score,
             explanation,
-            metadata,
-            status: 'ACTIVE', // Always start as ACTIVE to show in dashboard
-            created_at: new Date().toISOString()
-        };
+            JSON.stringify(metadata),
+            'ACTIVE',
+            new Date().toISOString()
+        ];
 
-        const { data, error } = await supabase
-            .from('alerts')
-            .insert([insertData])
-            .select();
-
-        if (error) {
-            console.error('[Alert Service] Supabase Insert Error:', error);
-            throw error;
-        }
-
-        const alert = data?.[0] || alertData;
+        const { rows } = await pool.query(queryText, values);
+        const alert = rows[0] || alertData;
 
         // Schedule auto-resolution for LOW and MEDIUM alerts (skip if severity is NULL)
         const shouldAutoResolve = normalizedSeverity && (normalizedSeverity === 'LOW' || normalizedSeverity === 'MEDIUM');
         if (shouldAutoResolve) {
-            // LOW: 5 seconds, MEDIUM: 10 seconds
             const delayMs = normalizedSeverity === 'LOW' ? 5000 : 10000;
             
             setTimeout(() => {
@@ -69,7 +67,6 @@ export const createAlert = async (alertData) => {
             console.log(`[Alert Service] Scheduled auto-resolve for ${normalizedSeverity} severity alert: ${alert.id} in ${delayMs/1000}s`);
         }
 
-        // If HIGH severity, send email notification
         if (normalizedSeverity === 'HIGH') {
             try {
                 await sendAlertEmail(process.env.BREVO_USER || 'admin@cyber.res', alert);
@@ -81,7 +78,6 @@ export const createAlert = async (alertData) => {
         return { success: true, alert };
     } catch (error) {
         console.error('Error creating alert:', error);
-        // Ensure error is a string for the JSON response
         const errorMessage = typeof error === 'object' ? JSON.stringify(error) : error.toString();
         return { success: false, error: errorMessage };
     }
@@ -89,36 +85,46 @@ export const createAlert = async (alertData) => {
 
 export const resolveAlert = async (alertId, resolutionData) => {
     try {
-        const updateData = {
-            status: 'RESOLVED',
-            resolution_notes: resolutionData.notes,
-            resolved_at: new Date().toISOString(),
-            resolved_by: resolutionData.userId,
-            resolution_type: 'MANUAL' // Manual resolution for HIGH severity alerts
-        };
+        // 1. Check existing resolution_type
+        const checkQuery = 'SELECT resolution_type FROM alerts WHERE id = $1';
+        const { rows: existingRows } = await pool.query(checkQuery, [alertId]);
+        const existingAlert = existingRows[0];
 
-        // Only set resolution_type if not already set (preserve AUTOMATED if it exists)
-        const { data: existingAlert } = await supabase
-            .from('alerts')
-            .select('resolution_type')
-            .eq('id', alertId)
-            .single();
+        let queryText;
+        let values;
 
-        // If resolution_type is already set to AUTOMATED, don't override it
         if (existingAlert?.resolution_type === 'AUTOMATED') {
-            delete updateData.resolution_type;
+            queryText = `
+                UPDATE alerts
+                SET 
+                    status = 'RESOLVED',
+                    resolution_notes = $1,
+                    resolved_at = $2,
+                    resolved_by = $3
+                WHERE id = $4
+                RETURNING *
+            `;
+            values = [resolutionData.notes, new Date().toISOString(), resolutionData.userId, alertId];
+        } else {
+            queryText = `
+                UPDATE alerts
+                SET 
+                    status = 'RESOLVED',
+                    resolution_notes = $1,
+                    resolved_at = $2,
+                    resolved_by = $3,
+                    resolution_type = 'MANUAL'
+                WHERE id = $4
+                RETURNING *
+            `;
+            values = [resolutionData.notes, new Date().toISOString(), resolutionData.userId, alertId];
         }
 
-        const { data, error } = await supabase
-            .from('alerts')
-            .update(updateData)
-            .eq('id', alertId)
-            .select();
-
-        if (error) throw error;
-        return { success: true, alert: data[0] };
+        const { rows } = await pool.query(queryText, values);
+        return { success: true, alert: rows[0] };
     } catch (error) {
         console.error('Error resolving alert:', error);
         return { success: false, error: error.message };
     }
 };
+

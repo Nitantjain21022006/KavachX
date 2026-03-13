@@ -1,5 +1,5 @@
 import redisClient from '../utils/redisClient.js';
-import supabase from '../utils/supabaseClient.js';
+import pool from '../utils/db.js';
 import { sendAlertEmail } from '../utils/mailer.js';
 
 export const executeResponse = async (alertId, action, target) => {
@@ -10,31 +10,22 @@ export const executeResponse = async (alertId, action, target) => {
 
         switch (action) {
             case 'BLOCK_IP':
-                // Store in Redis set of blocked IPs
                 await redisClient.sAdd('security:blocked_ips', target);
                 resultMessage = `IP Address ${target} has been blocked and added to Redis firewall set.`;
                 break;
 
             case 'DISABLE_USER':
-                // Update Supabase users table
-                const { error: userError } = await supabase
-                    .from('users')
-                    .update({ is_active: false })
-                    .eq('email', target);
-
-                if (userError) throw userError;
+                const updateUserQuery = 'UPDATE users SET is_active = false WHERE email = $1';
+                await pool.query(updateUserQuery, [target]);
                 resultMessage = `User account ${target} has been disabled in the primary identity database.`;
                 break;
 
             case 'NOTIFY_ADMIN':
-                // Get alert details to send meaningful email
-                const { data: alertData, error: alertError } = await supabase
-                    .from('alerts')
-                    .select('*')
-                    .eq('id', alertId)
-                    .single();
+                const selectAlertQuery = 'SELECT * FROM alerts WHERE id = $1';
+                const { rows: alertRows } = await pool.query(selectAlertQuery, [alertId]);
+                const alertData = alertRows[0];
 
-                if (alertError) throw alertError;
+                if (!alertData) throw new Error('Alert not found');
 
                 await sendAlertEmail(process.env.BREVO_USER, alertData);
                 resultMessage = `Security administrator has been notified via emergency email channel.`;
@@ -45,7 +36,9 @@ export const executeResponse = async (alertId, action, target) => {
         }
 
         // Log the response in the alert metadata
-        const { data: currentAlert } = await supabase.from('alerts').select('metadata').eq('id', alertId).single();
+        const { rows: currentAlertRows } = await pool.query('SELECT metadata FROM alerts WHERE id = $1', [alertId]);
+        const currentAlert = currentAlertRows[0];
+        
         const updatedMetadata = {
             ...(currentAlert?.metadata || {}),
             automation_response: {
@@ -56,10 +49,8 @@ export const executeResponse = async (alertId, action, target) => {
             }
         };
 
-        await supabase
-            .from('alerts')
-            .update({ metadata: updatedMetadata, status: 'OPEN' })
-            .eq('id', alertId);
+        const updateAlertQuery = 'UPDATE alerts SET metadata = $1, status = $2 WHERE id = $3';
+        await pool.query(updateAlertQuery, [JSON.stringify(updatedMetadata), 'OPEN', alertId]);
 
         return { success: true, message: resultMessage };
     } catch (error) {
@@ -67,3 +58,4 @@ export const executeResponse = async (alertId, action, target) => {
         return { success: false, error: error.message };
     }
 };
+

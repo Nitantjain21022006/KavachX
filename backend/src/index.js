@@ -5,6 +5,7 @@ import express from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import corsOptions from './config/cors.js';
+import pool from './utils/db.js';
 import errorMiddleware from './middleware/error.middleware.js';
 
 // Routes
