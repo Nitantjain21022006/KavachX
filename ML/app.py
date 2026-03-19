@@ -1,179 +1,98 @@
-from flask import Flask, request, jsonify
-import joblib
-import numpy as np
-import pandas as pd
-import logging
 import os
-from flask_cors import CORS
+import numpy as np
+import logging
+from flask import Flask, request, jsonify
 
-# ---------------- CATEGORY MAPS ----------------
-SECTOR_MAP = {
-    "Healthcare": 0,
-    "Agriculture": 1,
-    "Urban": 2,
-    "Energy": 3
-}
+# Modular Imports
+from core.processor import engineer_features_row
+from core.loader import load_bundle
+from core.engine import calculate_risk_score, get_severity_label, get_recommended_action
 
-PROTOCOL_MAP = {
-    "TCP": 0,
-    "UDP": 1,
-    "HTTP": 2,
-    "HTTPS": 3
-}
+# Configure Logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-OPERATION_MAP = {
-    "Read": 0,
-    "Write": 1
-}
-
-CONNECTION_MAP = {
-    "Connected": 1,
-    "Disconnected": 0
-}
-
-# ---------------- FEATURE ORDER ----------------
-FEATURE_COLUMNS = [
-    "device_id",
-    "sector",
-    "location_id",
-    "protocol",
-    "packet_size",
-    "latency_ms",
-    "connection_status",
-    "cpu_usage_percent",
-    "memory_usage_percent",
-    "battery_level",
-    "temperature_c",
-    "operation_type",
-    "data_value_integrity"
-]
-
-# ---------------- APP SETUP ----------------
 app = Flask(__name__)
-CORS(app)
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="[%(asctime)s] [%(levelname)s] %(message)s"
-)
+# Resolve paths
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, "model/cybersecurity_model.pkl")
 
-# ---------------- LOAD MODELS ----------------
-logging.info("Loading ML models...")
+# Global Bundle
+BUNDLE = load_bundle(MODEL_PATH)
 
-iso_forest = joblib.load("model/isolation_forest_model.pkl")
-xgb_model = joblib.load("model/xgboost_attack_model.pkl")
-scaler = joblib.load("model/scaler.pkl")
+@app.route('/health', methods=['GET'])
+def health():
+    """Health check endpoint to ensure the API and model are ready."""
+    return jsonify({
+        "status": "healthy",
+        "model_loaded": BUNDLE is not None,
+        "version": BUNDLE.get("version", "unknown") if BUNDLE else "N/A"
+    })
 
-logging.info("Models loaded successfully")
+@app.route('/predict', methods=['POST'])
+@app.route('/api/ml/analyze', methods=['POST'])
+def predict():
+    """
+    Main prediction endpoint.
+    1. Receives 36 raw features.
+    2. Performs on-the-fly feature engineering.
+    3. Executes multi-output prediction.
+    4. Calculates risk and severity.
+    """
+    if BUNDLE is None:
+        logger.error("Prediction attempt failed: Model bundle not loaded.")
+        return jsonify({"error": "Model bundle not loaded"}), 500
 
-ATTACK_MAP = {
-    0: "Normal",
-    1: "DDoS",
-    2: "Ransomware",
-    3: "MITM",
-    4: "Injection",
-    5: "Spoofing"
-}
+    raw_data = request.get_json()
+    if not raw_data:
+        return jsonify({"error": "No JSON payload provided"}), 400
 
-# ---------------- UTILITY FUNCTIONS ----------------
-def map_severity(confidence, is_anomalous):
-    if not is_anomalous:
-        return "Low"
-    if confidence >= 0.85:
-        return "Critical"
-    elif confidence >= 0.65:
-        return "High"
-    else:
-        return "Medium"
-
-def generate_reason(data, is_anomalous):
-    if not is_anomalous:
-        return ["Normal behavior observed"]
-
-    reasons = []
-
-    if data.get("packet_size", 0) > 1500:
-        reasons.append("Abnormally high packet size")
-    if data.get("latency_ms", 0) > 200:
-        reasons.append("High network latency")
-    if data.get("cpu_usage_percent", 0) > 80:
-        reasons.append("CPU usage spike detected")
-    if data.get("memory_usage_percent", 0) > 80:
-        reasons.append("High memory usage")
-    if data.get("data_value_integrity", 1) == 0:
-        reasons.append("Data integrity violation")
-
-    return reasons if reasons else ["Suspicious activity detected"]
-
-# ---------------- API ENDPOINT ----------------
-@app.route("/api/ml/analyze", methods=["POST"])
-def analyze():
     try:
-        data = request.get_json()
-        logging.info(f"Incoming request: {data}")
+        # 1. Modular Feature Engineering
+        eng_data = engineer_features_row(raw_data)
+        
+        # 2. Vectorize features in correct order
+        X_raw = np.array([eng_data.get(f, 0) for f in BUNDLE["feature_cols"]]).reshape(1, -1)
+        
+        # 3. Scale & Predict
+        X_sc = BUNDLE["scaler"].transform(X_raw)
+        preds = BUNDLE["model"].predict(X_sc)[0] 
+        probas = BUNDLE["model"].predict_proba(X_sc)
+        
+        # 4. Extract metrics
+        anomaly_score = float(probas[0][0][1])
+        confidence = float(np.max(probas[1][0]))
+        attack_type = BUNDLE["label_map"][int(preds[1])]
+        prob_normal = probas[1][0][0]
+        
+        # 5. Modular Risk Calculation
+        fp_prob = (1 - confidence) * 0.6 + prob_normal * 0.4
+        risk_score = calculate_risk_score(anomaly_score, confidence, attack_type)
+        severity = get_severity_label(risk_score)
+        action = get_recommended_action(attack_type, severity)
 
-        # ---------------- ENCODE CATEGORICALS ----------------
-        data["sector"] = SECTOR_MAP.get(data.get("sector"), 0)
-        data["protocol"] = PROTOCOL_MAP.get(data.get("protocol"), 0)
-        data["operation_type"] = OPERATION_MAP.get(data.get("operation_type"), 0)
-        data["connection_status"] = CONNECTION_MAP.get(data.get("connection_status"), 0)
-
-        # Safety: device_id must be numeric
-        try:
-            data["device_id"] = int(data.get("device_id", 0))
-        except:
-            data["device_id"] = 0
-
-        # ---------------- CREATE DATAFRAME ----------------
-        df = pd.DataFrame([data])
-
-        # Enforce column order
-        X = df[FEATURE_COLUMNS]
-
-        # ---------------- SCALE ----------------
-        X_scaled = scaler.transform(X)
-
-        # ---------------- ANOMALY DETECTION ----------------
-        anomaly_raw = iso_forest.predict(X_scaled)[0]
-        is_anomalous = bool(anomaly_raw == -1)
-
-        logging.info(f"Anomaly result: {is_anomalous}")
-
-        # ---------------- ATTACK CLASSIFICATION ----------------
-        probabilities = xgb_model.predict_proba(X_scaled)[0]
-        pred_class = int(np.argmax(probabilities))
-        confidence = float(np.max(probabilities))
-
-        ml_attack = ATTACK_MAP.get(pred_class, "Normal")
-
-        # 🔥 FORCE NORMAL IF NOT ANOMALOUS
-        final_attack = "Normal" if not is_anomalous else ml_attack
-
-        response = {
-            "attack_type": final_attack,
-            "is_anomalous": bool(is_anomalous),
-            "confidence": float(round(confidence, 2)),
-            "severity": map_severity(confidence, is_anomalous),
-            "reason": generate_reason(data, is_anomalous)
+        # 6. Response Construction
+        alert = {
+            "attack_detected": bool(preds[0] > 0),
+            "anomaly_score": round(anomaly_score, 4),
+            "attack_type": attack_type,
+            "attack_category": BUNDLE["category_map"].get(attack_type, "N/A"),
+            "confidence_score": round(confidence, 4),
+            "false_positive_prob": round(fp_prob, 4),
+            "severity_score": severity,
+            "risk_score": risk_score, # Already rounded to 2 decimals
+            "recommended_action": action
         }
-
-        logging.info(f"ML Response: {response}")
-        return jsonify(response), 200
+        
+        logger.info(f"Prediction: {attack_type} | Severity: {severity} | Risk: {risk_score}")
+        return jsonify(alert)
 
     except Exception as e:
-        logging.error(f"ML Service Error: {str(e)}", exc_info=True)
+        logger.exception("Internal error during prediction processing.")
+        return jsonify({"error": "Server error", "message": str(e)}), 500
 
-        # 🔥 FAIL SAFE: NEVER BREAK PIPELINE
-        return jsonify({
-            "attack_type": "Normal",
-            "is_anomalous": False,
-            "confidence": 0.0,
-            "severity": "Low",
-            "reason": ["ML fallback due to processing error"]
-        }), 200
-
-# ---------------- RUN SERVER ----------------
-if __name__ == "__main__":
+if __name__ == '__main__':
+    logger.info("Initializing Cyber-ML Unified API...")
     port = int(os.environ.get("PORT", 5000))
-    logging.info(f"Starting ML service on port {port}")
-    app.run(host="0.0.0.0", port=port)
+    app.run(host='0.0.0.0', port=port, debug=False)

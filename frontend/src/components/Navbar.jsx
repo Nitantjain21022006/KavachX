@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Shield, LayoutDashboard, AlertTriangle, BarChart3, Settings, LogOut } from 'lucide-react';
+import { Shield, LayoutDashboard, AlertTriangle, BarChart3, Settings, LogOut, Crosshair } from 'lucide-react';
 
 const Navbar = () => {
     const { user, logout } = useAuth();
@@ -16,6 +16,7 @@ const Navbar = () => {
         { to: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
         { to: '/alerts', label: 'Alerts', icon: <AlertTriangle size={18} /> },
         { to: '/metrics', label: 'System Metrics', icon: <BarChart3 size={18} /> },
+        { to: '/astraxfront', label: 'AstraX', icon: <Crosshair size={18} style={{ color: '#ff003c' }} /> },
         ...(user?.role === 'ADMIN' ? [{ to: '/settings', label: 'Settings', icon: <Settings size={18} /> }] : []),
     ];
 

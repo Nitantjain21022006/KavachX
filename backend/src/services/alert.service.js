@@ -32,8 +32,8 @@ const autoResolveAlert = async (alertId, severity) => {
 
 export const createAlert = async (alertData) => {
     const { sector, type, severity, score, explanation, metadata } = alertData;
-    // If severity is null (Normal attack type), keep it as null; otherwise normalize
-    const normalizedSeverity = severity === null ? null : (severity?.toUpperCase() || 'LOW');
+    // If severity is null (Normal attack type), default mapping to 'LOW' to satisfy NOT NULL DB constraint
+    const normalizedSeverity = severity === null ? 'LOW' : (severity?.toUpperCase() || 'LOW');
 
     try {
         const queryText = `

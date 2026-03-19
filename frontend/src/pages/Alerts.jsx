@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { Search, Filter, AlertTriangle, Eye, CheckCircle, ChevronDown, ChevronUp, Info, Shield } from 'lucide-react';
 import api from '../api/axiosInstance';
 import SeverityBadge from '../components/SeverityBadge';
-import IPPatternBadge from '../components/IPPatternBadge';
 import AlertReasonPanel from '../components/AlertReasonPanel';
 
 const Alerts = () => {
@@ -11,6 +10,7 @@ const Alerts = () => {
     const [loading, setLoading] = useState(true);
     const [filterSector, setFilterSector] = useState('');
     const [filterSeverity, setFilterSeverity] = useState('');
+    const [hideNormal, setHideNormal] = useState(true);
     const [currentPage, setCurrentPage] = useState(1);
     const [expandedAlerts, setExpandedAlerts] = useState(new Set());
     const alertsPerPage = 10;
@@ -58,6 +58,8 @@ const Alerts = () => {
         const sixtySecondsAgo = now - 60 * 1000;
 
         alerts.forEach(alert => {
+            if (hideNormal && alert.type === 'ML_NORMAL') return;
+            
             const alertTime = new Date(alert.created_at).getTime();
             const key = `${alert.type}_${alert.sector}_${alert.severity || 'NULL'}`;
             
@@ -128,6 +130,16 @@ const Alerts = () => {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer text-[10px] font-black uppercase tracking-widest text-[#00f3ff] hover:text-white transition-colors bg-[#00f3ff]/5 px-3 py-2.5 rounded-xl border border-[#00f3ff]/10">
+                        <input
+                            type="checkbox"
+                            checked={hideNormal}
+                            onChange={(e) => setHideNormal(e.target.checked)}
+                            className="accent-[#00f3ff] h-3 w-3 bg-black/40 border-white/10"
+                        />
+                        Hide 'Normal' Traffic
+                    </label>
+
                     <div className="relative group">
                         <Filter size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#00f3ff]/40 group-focus-within:text-[#00f3ff]" />
                         <select
@@ -197,17 +209,19 @@ const Alerts = () => {
                                                     </div>
                                                     <div className="flex-1">
                                                         <div className="flex items-center gap-3 mb-1">
-                                                            <span className="font-black text-white uppercase italic tracking-wider text-lg">{group.type}</span>
+                                                            <span className="font-black text-white uppercase italic tracking-wider text-lg">{group.type.replace(/^ML_/, '')}</span>
                                                             {group.count > 1 && (
                                                                 <span className="px-2.5 py-0.5 rounded-full bg-[#00f3ff]/10 text-[#00f3ff] text-[9px] font-black uppercase border border-[#00f3ff]/20">
                                                                     Aggregated from {group.count} events
                                                                 </span>
                                                             )}
                                                         </div>
-                                                        <div className="flex items-center gap-4 flex-wrap">
+                                                        <div className="flex items-center gap-4 flex-wrap mt-2">
                                                             <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{group.sector}</span>
                                                             <SeverityBadge severity={group.severity} />
-                                                            <IPPatternBadge alert={latestAlert} />
+                                                            <span className="text-[10px] font-black text-[#00f3ff] uppercase tracking-widest bg-[#00f3ff]/10 px-2 py-0.5 rounded border border-[#00f3ff]/20">
+                                                                CAT: {latestAlert.metadata?.ml_response?.attack_category || 'Unknown'}
+                                                            </span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -258,8 +272,13 @@ const Alerts = () => {
                                         {/* Expanded suppressed events */}
                                         {isExpanded && group.count > 1 && (
                                             <div className="mt-4 pt-4 border-t border-white/5">
-                                                <div className="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-3">
-                                                    Suppressed Events ({group.count - 1} similar in last 60s)
+                                                <div className="flex justify-between items-end mb-3">
+                                                    <div className="text-[9px] font-black text-gray-600 uppercase tracking-widest">
+                                                        Suppressed Events ({group.count - 1} similar in last 60s)
+                                                    </div>
+                                                    <div className="text-[9px] font-black text-[#00f3ff] uppercase tracking-widest bg-[#00f3ff]/10 px-2.5 py-1 rounded-lg border border-[#00f3ff]/20">
+                                                        {new Set(group.alerts.map(a => a.metadata?.ip).filter(Boolean)).size} Unique Source IPs
+                                                    </div>
                                                 </div>
                                                 <div className="space-y-2 max-h-48 overflow-y-auto">
                                                     {group.alerts.slice(1).map((suppressedAlert, idx) => (

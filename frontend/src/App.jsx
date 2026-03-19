@@ -12,6 +12,7 @@ import Alerts from './pages/Alerts';
 import AlertDetails from './pages/AlertDetails';
 import SystemMetrics from './pages/SystemMetrics';
 import Settings from './pages/Settings';
+import AstraXfront from './pages/AstraXfront';
 import Navbar from './components/Navbar';
 import Layout from './components/Layout';
 
@@ -42,6 +43,9 @@ function App() {
                         <Route path="/verify-otp" element={<VerifyOTP />} />
                         <Route path="/forgot-password" element={<ForgotPassword />} />
                         <Route path="/reset-password" element={<ResetPassword />} />
+                        
+                        {/* Simulation Tool - Unprotected for dev ease */}
+                        <Route path="/astraxfront" element={<AstraXfront />} />
 
                         {/* Protected App Routes */}
                         <Route path="/dashboard" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />

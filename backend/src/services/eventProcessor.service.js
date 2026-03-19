@@ -3,45 +3,40 @@ import pool from '../utils/db.js';
 import { analyzeMetrics } from '../utils/mlClient.js';
 import { createAlert } from './alert.service.js';
 
+/**
+ * Main event processing pipeline.
+ * Flow: Receive Event → Store in DB → Update Redis Window → Extract 36 Features → Call ML → Create Alert
+ *
+ * Severity categorization (High / Medium / Low) is determined EXCLUSIVELY by the ML model.
+ * There is NO hardcoded severity logic here.
+ */
 export const processEvent = async (event) => {
-    const { sector: rawSector, type, severity: eventSeverity = 'LOW', metadata } = event;
-    const sector = rawSector.toUpperCase(); // Ensure sector is uppercase for consistency
+    const { sector: rawSector, type, metadata } = event;
+    const sector = rawSector.toUpperCase();
     const timestamp = Date.now();
     const isoTimestamp = new Date(timestamp).toISOString();
     const ip = metadata?.ip || '127.0.0.1';
 
     try {
+        // ── Step 1: Store raw event in PostgreSQL ──────────────────────────────
         console.log(`[Processor] Step 1: Storing event in PostgreSQL...`);
         const insertEventQuery = `
             INSERT INTO events (sector, type, severity, metadata, created_at)
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
         `;
-        const eventValues = [
-            sector,
-            type,
-            eventSeverity.toUpperCase(),
-            JSON.stringify(metadata),
-            isoTimestamp
-        ];
-
+        // The events table has a NOT NULL constraint on severity. 
+        // We insert a default 'LOW' here. The actual critical evaluation and 
+        // accurate severity classification happens in the ML model and is stored in the 'alerts' table.
+        const eventValues = [sector, type, 'LOW', JSON.stringify(metadata), isoTimestamp];
         const { rows: eventRows } = await pool.query(insertEventQuery, eventValues);
         const storedEvent = eventRows[0];
-
         console.log(`[Processor] Event stored successfully with ID: ${storedEvent?.id}`);
 
-        // 2. Update Redis Tracking
+        // ── Step 2: Update Redis Sliding Window ───────────────────────────────
         const windowKey = `window:events:${sector}`;
         console.log(`[Processor] Step 2: Adding to Redis window: ${windowKey}`);
-
-        const eventData = {
-            type,
-            severity: eventSeverity,
-            ip,
-            timestamp,
-            eventId: storedEvent?.id
-        };
-
+        const eventData = { type, ip, timestamp, eventId: storedEvent?.id };
         try {
             await redisClient.zAdd(windowKey, { score: timestamp, value: JSON.stringify(eventData) });
             await redisClient.zRemRangeByScore(windowKey, 0, timestamp - 2 * 60 * 1000);
@@ -49,139 +44,127 @@ export const processEvent = async (event) => {
             console.error('[Processor] Redis Error (Non-blocking):', redisErr);
         }
 
-        // 3. Extract High-Fidelity Metrics from Metadata (Prioritize individual event features)
-        console.log(`[Processor] Step 3: Extracting high-fidelity metrics...`);
-        const highFidelityMetrics = {
-            device_id: metadata?.device_id || 0,
-            location_id: metadata?.location_id || 0,
-            ip: metadata?.ip || ip,
-            ip_src: metadata?.ip_src || 0,
-            ip_dest: metadata?.ip_dest || 0,
-            protocol: metadata?.protocol || 'TCP',
-            packet_size: metadata?.packet_size || 500,
-            latency_ms: metadata?.latency_ms || 50,
-            cpu_usage_percent: metadata?.cpu_usage_percent || 30,
-            memory_usage_percent: metadata?.memory_usage_percent || 40,
-            battery_level: metadata?.battery_level || 80,
-            temperature_c: metadata?.temperature_c || 25,
-            connection_status: metadata?.connection_status || 'Connected',
-            operation_type: metadata?.operation_type || 'Read',
-            data_value_integrity: metadata?.data_value_integrity ?? 1,
-            is_anomaly: metadata?.is_anomaly || 0,
-            event_type: type // Pass event type for hardcoded pattern matching
-        };
-
-        // Also aggregate window metrics for additional context (optional, but good for logs)
+        // ── Step 3: Gather lightweight context from Redis window ───────────────
         const oneMinuteAgo = timestamp - 60 * 1000;
-        const recentEventsRaw = await redisClient.zRange(windowKey, oneMinuteAgo, timestamp, { BY: 'SCORE' });
-
-        let uniqueIps = 0;
+        let recentEventsRaw = [];
         try {
-            uniqueIps = new Set(recentEventsRaw.map(e => {
-                try { return JSON.parse(e).ip; } catch { return null; }
-            }).filter(Boolean)).size;
+            recentEventsRaw = await redisClient.zRange(windowKey, oneMinuteAgo, timestamp, { BY: 'SCORE' });
         } catch (e) {
-            console.warn('[Processor] Context aggregation failed:', e.message);
+            console.warn('[Processor] Redis zRange failed (Non-blocking):', e.message);
         }
+        const eventRate60s = recentEventsRaw.length;
 
-        const contextMetrics = {
-            event_rate_60s: recentEventsRaw.length,
-            unique_ips_60s: uniqueIps
+        // ── Step 4: Extract all 36 ML Features from metadata ──────────────────
+        // These are the exact features the new ML model was trained on.
+        // Defaults represent benign / normal traffic so the model can still run
+        // even on events that don't carry every feature.
+        console.log(`[Processor] Step 4: Extracting 36 ML features from metadata...`);
+        const mlFeatures = {
+            // Network Traffic
+            packet_count:               metadata?.packet_count               ?? 50,
+            byte_count:                 metadata?.byte_count                 ?? 5000,
+            syn_packet_count:           metadata?.syn_packet_count           ?? 5,
+            syn_ack_ratio:              metadata?.syn_ack_ratio              ?? 0.8,
+            unique_source_ips:          metadata?.unique_source_ips          ?? 2,
+            unique_destination_ips:     metadata?.unique_destination_ips     ?? 2,
+            packets_per_second:         metadata?.packets_per_second         ?? 1,
+
+            // Authentication
+            failed_login_count:         metadata?.failed_login_count         ?? 0,
+            login_attempts:             metadata?.login_attempts             ?? 1,
+
+            // SSL / TLS
+            ssl_certificate_valid:      metadata?.ssl_certificate_valid      ?? 1,
+            certificate_mismatch:       metadata?.certificate_mismatch       ?? 0,
+
+            // ARP / Network Scanning
+            arp_request_rate:           metadata?.arp_request_rate           ?? 2,
+            mac_change_rate:            metadata?.mac_change_rate            ?? 0,
+            duplicate_ip_detected:      metadata?.duplicate_ip_detected      ?? 0,
+
+            // Phishing / Web
+            url_length:                 metadata?.url_length                 ?? 25,
+            suspicious_keyword_count:   metadata?.suspicious_keyword_count   ?? 0,
+            domain_age:                 metadata?.domain_age                 ?? 1000,
+            redirect_count:             metadata?.redirect_count             ?? 0,
+
+            // File System / Ransomware
+            file_modification_rate:     metadata?.file_modification_rate     ?? 5,
+            file_rename_count:          metadata?.file_rename_count          ?? 1,
+            file_extension_change:      metadata?.file_extension_change      ?? 0,
+            registry_modification_rate: metadata?.registry_modification_rate ?? 1,
+
+            // System Performance
+            cpu_usage_spike:            metadata?.cpu_usage_spike            ?? 10,
+            disk_write_rate:            metadata?.disk_write_rate            ?? 20,
+
+            // API / HTTP
+            api_request_count:          metadata?.api_request_count          ?? 5,
+            http_response_code_200:     metadata?.http_response_code_200     ?? 100,
+            http_response_code_404:     metadata?.http_response_code_404     ?? 0,
+            user_agent_missing:         metadata?.user_agent_missing         ?? 0,
+            referrer_missing:           metadata?.referrer_missing           ?? 0,
+
+            // Session
+            cookie_count:               metadata?.cookie_count               ?? 5,
+            session_duration:           metadata?.session_duration           ?? 1200,
+
+            // System Resources
+            process_count:              metadata?.process_count              ?? 40,
+            thread_count:               metadata?.thread_count               ?? 100,
+            memory_usage_mb:            metadata?.memory_usage_mb            ?? 2048,
+            network_io_rate:            metadata?.network_io_rate            ?? 50,
+            system_up_time:             metadata?.system_up_time             ?? 7200,
         };
 
-        console.log(`[Processor] Step 4: Calling ML Service with high-fidelity data...`);
-        const analysis = await analyzeMetrics(sector, highFidelityMetrics);
-        console.log(`[Processor] ML Result: is_anomaly=${analysis.is_anomaly}, attack=${analysis.attack_type}, severity=${analysis.severity}`);
+        // ── Step 5: Call ML Model ──────────────────────────────────────────────
+        console.log(`[Processor] Step 5: Calling ML Service...`);
+        const analysis = await analyzeMetrics(sector, mlFeatures);
+        console.log(`[Processor] ML Result: attack_detected=${analysis.attack_detected}, type=${analysis.attack_type}, severity=${analysis.severity}, risk=${analysis.risk_score}`);
 
-        // 5. Severity Escalation Layer (Fixing Temporal Blindness)
-        let finalSeverity = (analysis.severity || 'LOW').toUpperCase();
-        const eventRate = contextMetrics.event_rate_60s || 0;
-        const currentUniqueIps = contextMetrics.unique_ips_60s || 0;
-        let escalationReason = '';
+        // ── Step 6: Build alert from ML output (no hardcoded overrides) ────────
+        // severity comes directly from the ML model as 'High', 'Medium', or 'Low'
+        // and is null for normal (non-attack) traffic.
+        const mlSeverity = analysis.severity
+            ? analysis.severity.toUpperCase()
+            : null;
 
-        // --- Sector-Specific Refinement: AGRICULTURE ---
-        if (sector === 'AGRICULTURE') {
-            const { latency_ms, packet_size, battery_level, data_value_integrity } = highFidelityMetrics;
+        const alertType = analysis.attack_type !== 'Normal'
+            ? `ML_${analysis.attack_type.toUpperCase()}`
+            : 'ML_NORMAL';
 
-            // Trigger HIGH: Critical Malicious Signals
-            if (eventRate >= 30 || data_value_integrity === 0 || latency_ms >= 800) {
-                if (finalSeverity !== 'HIGH') {
-                    finalSeverity = 'HIGH';
-                    escalationReason = ` [AGRICULTURE_CRITICAL: ${data_value_integrity === 0 ? 'INTEGRITY_FAILURE' : 'HIGH_FREQUENCY_BURST'}]`;
+        // Always create an alert so every event is tracked; Normal traffic has null severity.
+        console.log(`[Processor] Step 6: Creating alert... Type: ${alertType}, Severity: ${mlSeverity ?? 'NULL (Normal)'}`);
+        try {
+            const alertResult = await createAlert({
+                sector,
+                type:        alertType,
+                severity:    mlSeverity,
+                score:       parseFloat(analysis.confidence   ?? 0),
+                confidence:  parseFloat(analysis.confidence   ?? 0),
+                explanation: analysis.explanation,
+                metadata: {
+                    ...metadata,
+                    ml_features:  mlFeatures,
+                    context: {
+                        event_rate_60s: eventRate60s,
+                    },
+                    ml_response:  analysis,
                 }
-            }
-            // Trigger MEDIUM: Operational Instability Signals
-            else if (eventRate >= 15 || latency_ms >= 400 || packet_size >= 1000 || battery_level < 50) {
-                if (finalSeverity === 'LOW') {
-                    finalSeverity = 'MEDIUM';
-                    escalationReason = ' [AGRICULTURE_STRESS: SENSOR_INSTABILITY_DETECTED]';
-                }
-            }
-        }
-        // --- Sector-Specific Refinement: URBAN ---
-        else if (sector === 'URBAN') {
-            const { operation_type, data_value_integrity, connection_status } = highFidelityMetrics;
-
-            // Trigger HIGH: Active Infrastructure Compromise
-            if (eventRate >= 40 && currentUniqueIps >= 5 && data_value_integrity === 0 && operation_type === 'Write') {
-                if (finalSeverity !== 'HIGH') {
-                    finalSeverity = 'HIGH';
-                    escalationReason = ' [URBAN_CRITICAL: COORDINATED_OVERRIDE_ATTEMPT]';
-                }
-            }
-            // Trigger MEDIUM: Suspicious Activity
-            else if (eventRate >= 10 && currentUniqueIps >= 2 && operation_type === 'Write') {
-                if (finalSeverity === 'LOW') {
-                    finalSeverity = 'MEDIUM';
-                    escalationReason = ' [URBAN_STRESS: MULTI_IP_WRITE_BURST]';
-                }
-            }
-        }
-        // --- Generic Escalation (Other Sectors) ---
-        else {
-            if (eventRate > 10) {
-                finalSeverity = 'HIGH';
-            } else if (eventRate > 3) {
-                if (finalSeverity === 'LOW') finalSeverity = 'MEDIUM';
-            }
-        }
-
-        // 6. If Anomaly or Attack Detected, create an alert (including Normal for display)
-        if (analysis.is_anomaly || analysis.attack_type !== 'Normal' || finalSeverity !== 'LOW' || analysis.attack_type === 'Normal') {
-            // For Normal attack type, set severity to NULL (not a threat)
-            const alertSeverity = analysis.attack_type === 'Normal' ? null : finalSeverity;
-            const alertType = analysis.attack_type !== 'Normal' ? `ML_${analysis.attack_type.toUpperCase()}` : `ML_NORMAL`;
-            
-            console.log(`[Processor] Step 6: Creating alert... Type: ${alertType}, Severity: ${alertSeverity || 'NULL'} (Rate: ${eventRate})`);
-            try {
-                const alertResult = await createAlert({
-                    sector,
-                    type: alertType,
-                    severity: alertSeverity,
-                    score: parseFloat(analysis.confidence || 0),
-                    confidence: parseFloat(analysis.confidence || 0),
-                    explanation: analysis.explanation + escalationReason + (finalSeverity !== (analysis.severity || 'LOW').toUpperCase() && !escalationReason && alertSeverity !== null ? ` [FREQUENCY ESCALATION: ${eventRate} events/min]` : ''),
-                    metadata: {
-                        ...metadata,
-                        metrics: highFidelityMetrics,
-                        context: contextMetrics,
-                        ml_response: analysis,
-                        escalated: alertSeverity !== null && finalSeverity !== (analysis.severity || 'LOW').toUpperCase()
-                    }
-                });
-                console.log(`[Processor] Alert creation result:`, alertResult.success ? 'Success' : 'Failed');
-            } catch (alertErr) {
-                console.error('[Processor] Alert Escalation Failed (Non-blocking):', alertErr.message);
-            }
+            });
+            console.log(`[Processor] Alert creation result:`, alertResult.success ? 'Success' : 'Failed');
+        } catch (alertErr) {
+            console.error('[Processor] Alert Creation Failed (Non-blocking):', alertErr.message);
         }
 
         console.log(`[Processor] SUCCESS: Pipeline complete for event ID: ${storedEvent?.id || 'N/A'}`);
         return {
             success: true,
             eventId: storedEvent?.id || null,
-            analysis: analysis || null,
-            metrics: highFidelityMetrics || null
+            analysis,
+            ml_features: mlFeatures
         };
+
     } catch (error) {
         console.error('CRITICAL: Event Processing System Error:', error);
         const errorMessage = error?.message || (typeof error === 'object' ? JSON.stringify(error) : String(error));

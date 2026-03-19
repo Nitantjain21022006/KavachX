@@ -2,7 +2,10 @@ import * as eventProcessor from '../services/eventProcessor.service.js';
 import pool from '../utils/db.js';
 
 export const ingestEvent = async (req, res) => {
-    const { sector, type, severity, metadata } = req.body;
+    // Note: `severity` is intentionally NOT destructured from req.body.
+    // Severity categorization (High / Medium / Low) is determined exclusively
+    // by the ML model. External clients should not and cannot override it.
+    const { sector, type, metadata } = req.body;
 
     if (!sector || !type) {
         return res.status(400).json({
@@ -17,7 +20,6 @@ export const ingestEvent = async (req, res) => {
     const result = await eventProcessor.processEvent({
         sector,
         type,
-        severity,
         metadata: enhancedMetadata
     });
 
