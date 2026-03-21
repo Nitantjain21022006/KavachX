@@ -1,153 +1,113 @@
-# 🛡️ KavachX: Cyber-Resilient Infrastructure Platform
+# 🛡️ KAVACH-X: CRITICAL INFRASTRUCTURE RESILIENCE
 
-[![Cybersecurity](https://img.shields.io/badge/Security-Red-red?style=for-the-badge&logo=shippable&logoColor=white)](https://github.com/OddlyEvenn/KavachX)
-[![Framework](https://img.shields.io/badge/Framework-React--Vite-blue?style=for-the-badge&logo=react)](https://reactjs.org/)
-[![Backend](https://img.shields.io/badge/Backend-Node--Express-339933?style=for-the-badge&logo=node.js)](https://nodejs.org/)
-[![Database](https://img.shields.io/badge/Database-Postgres--Supabase-3ECF8E?style=for-the-badge&logo=supabase)](https://supabase.com/)
+![Cyber-Security](https://img.shields.io/badge/Status-OPERATIONAL-39ff14?style=for-the-badge&logoColor=white) 
+![Sector-Healthcare](https://img.shields.io/badge/Sector-HEALTHCARE-ff003c?style=for-the-badge)
+![Sector-Agriculture](https://img.shields.io/badge/Sector-AGRICULTURE-bc13fe?style=for-the-badge)
+![Sector-Urban](https://img.shields.io/badge/Sector-URBAN-00f3ff?style=for-the-badge)
 
-**KavachX** is a next-generation security monitoring and autonomous resilience platform engineered for critical infrastructure preservation. It provides real-time oversight for three primary sectors: **Healthcare**, **Agriculture**, and **Urban Systems**, utilizing advanced 15-feature XGBoost Machine Learning to detect, classify, and mitigate cyber-kinetic threats.
+**KavachX** (Armor-X) is an autonomous cyber-kinetic defense platform designed to preserve the operational integrity of critical infrastructure. It integrates real-time telemetry ingestion with 15-feature XGBoost ensemble inference to provide high-fidelity threat detection and automated response protocols.
 
 ---
 
-## 🏗️ System Architecture
+## 🏛️ THREE-SECTOR RESILIENCE PARADIGM
 
-KavachX operates on a distributed 3-tier architecture designed for high throughput and low-latency inference.
+KavachX provides context-aware security for three vital infrastructure domains:
+
+-   🏥 **HEALTHCARE INFRASTRUCTURE**: Protecting patient telemetry, medical IoT (IoMT), and diagnostic data integrity from ransomware and synchronization attacks.
+-   🌾 **SMART AGRICULTURE**: Securing irrigation control systems, soil sensor arrays, and supply-chain logistics against unauthorized interception.
+-   🏙️ **URBAN MUNICIPAL SYSTEMS**: Defending smart grid actuators, traffic control processors, and water management telemetry from DDoS and lateral movements.
+
+---
+
+## 🏗️ TACTICAL SYSTEM ARCHITECTURE
 
 ```mermaid
 graph TD
-    subgraph "Edge / Simulation"
-        AstraX["AstraX (Threat Simulator)"]
+    subgraph "SENSING LAYER (EDGE)"
+        AstraX["AstraX: Multi-Vector Threat Simulator"]
     end
 
-    subgraph "Resilience Layer (Backend)"
-        API["Express.js API"]
-        Redis["Redis (Contextual Memory)"]
-        EventProc["Event Processing Pipeline"]
+    subgraph "RESILIENCE LAYER (BACKEND)"
+        API["Node.js / Express Gateway"]
+        Redis["Redis: Contextual Sliding Window"]
+        EventProc["Event Processing SOP"]
     end
 
-    subgraph "Cognitive Engine (ML)"
-        MLApp["Python/Flask ML Service"]
-        XGB["XGBoost (15-Feature Inference)"]
+    subgraph "COGNITIVE ENGINE (ML)"
+        MLService["Python ML Inception API"]
+        XGB["XGBoost Multi-Output Model"]
     end
 
-    subgraph "UI Layer (KavachX Hub)"
-        Dashboard["Operator Dashboard"]
-        LiveFeed["Anomaly Stream (SSE)"]
+    subgraph "OPERATIONAL PERSISTENCE"
+        DB["Supabase: PostgreSQL Persistence"]
     end
 
-    subgraph "Persistence"
-        DB["PostgreSQL (Supabase)"]
+    subgraph "OPERATOR INTERFACE"
+        Dashboard["KavachX Central Command"]
+        Alerts["Anomaly Stream (SSE)"]
     end
 
-    AstraX -- "36-Feature Telemetry" --> API
+    AstraX -- "36-Feature Raw Telemetry" --> API
     API --> EventProc
-    EventProc -- "Context Update" --> Redis
-    EventProc -- "Inference Request" --> MLApp
-    MLApp --> XGB
-    XGB -- "Risk/Severity Classification" --> MLApp
-    MLApp -- "ML-Augmented Data" --> EventProc
-    EventProc -- "Store Alert/Event" --> DB
+    EventProc -- "Context Remittance" --> Redis
+    EventProc -- "Inference Request" --> MLService
+    MLService --> XGB
+    XGB -- "Risk/Severity Categorization" --> MLService
+    MLService -- "Classified Heuristics" --> EventProc
+    EventProc -- "Atomic Commit" --> DB
     Dashboard <--> API
-    API -- "Live Proxy" --> LiveFeed
+    API -- "Broadcast" --> Alerts
 ```
 
 ---
 
-## 📊 Data Model (ER Diagram)
+## 📊 CORE SECURITY HEURISTICS (ML)
 
-The core data structure ensures strict relationship integrity between operational events, classified alerts, and governance policies.
+The KavachX Cognitive Engine distills 36 raw data points into **7 Essential Vulnerability Pillars**:
 
-```mermaid
-erDiagram
-    USERS ||--o{ ALERTS : "resolves"
-    ALERTS }|--|| SECTORS : "reported_on"
-    EVENTS }|--|| SECTORS : "belongs_to"
-    USERS ||--o{ SECTORS : "owns"
-    OTP_VERIFICATIONS ||--|| USERS : "verifies"
-    SETTINGS_SECURITY ||--o{ ALERTS : "governs"
-    
-    USERS {
-        uuid id PK
-        string email
-        string role "ADMIN | ANALYST | SECTOR_OWNER"
-        string sector "HEALTHCARE | AGRICULTURE | URBAN"
-        string name
-        boolean is_verified
-    }
-    
-    ALERTS {
-        uuid id PK
-        string sector
-        string type "DDoS | MITM | RANSOMWARE | etc."
-        string severity "HIGH | MEDIUM | LOW"
-        float risk_score
-        string status "ACTIVE | RESOLVED"
-        string resolution_type "AUTOMATED | MANUAL"
-        uuid resolved_by FK
-    }
-
-    EVENTS {
-        uuid id PK
-        string sector
-        string type
-        string severity
-        jsonb metadata "Raw Telemetry & 36 Features"
-    }
-
-    SECTORS {
-        uuid id PK
-        string name "HEALTHCARE | AGRICULTURE | URBAN"
-        boolean is_enabled
-        uuid owner_id FK
-    }
-```
+| Pillar | Focus Area | Detection Vector |
+| :--- | :--- | :--- |
+| **Login Failure Sigma** | Identity & Access | Bruteforce, Credential Stuffing |
+| **Payload Entropy** | Network Traffic | Anomalous Packet Size, Buffer Overflows |
+| **SYN-Flood Coefficient** | Availability | TCP State Exhaustion, DDoS |
+| **MITM Risk Index** | Data Integrity | ARP Spoofing, SSL/TLS Mismatch |
+| **Ransomware Vector** | File Integrity | Unauthorized IO, Modification Rate Spikes |
+| **Topology Scan Risk** | Reconnaissance | Port Scanning, Horizontal Movement |
+| **Phishing Probability** | Human Vector | Domain Age, Keyword Entropy, Redirections |
 
 ---
 
-## 🔬 Cognitive Intelligence (ML)
+## 🛡️ GOVERNANCE & CONTROL MATRIX
 
-The heart of KavachX is its **15-Feature Ensemble Classifier**, which reduces 36 raw telemetry points into actionable security heuristics.
-
--   **Raw Ingestion**: 36 diverse features (Packet counts, Entropy, Authentication states, SSL validations, etc.).
--   **Ensemble Engine**: XGBoost model performing multi-output prediction for Attack Detection and Attack Classification simultaneously.
--   **Risk Scoring**: Dynamic calculation based on `anomaly_score`, `confidence`, and `attack_velocity`.
-
----
-
-## ⚡ Key Modules
-
-1. **AstraX Simulator**: A precision tool for stress-testing infrastructure by injecting simulated multi-vector attacks.
-2. **Telemetry Lab**: Interactive grid-monitoring for hardware and network utilization metrics.
-3. **Autonomous Defense**: Governance-driven "Self-Healing" that executes mitigations (IP blocking, account lockout) without human intervention based on ML severity.
-4. **Sector Dossiers**: Instant PDF auditing reports generated from live threat databases.
+| Feature | Protocol | Purpose |
+| :--- | :--- | :--- |
+| **Autonomous Defense** | Direct Suppression | Automated IP blocking for HIGH severity threats. |
+| **Identity Sovereignty** | JWT/HTTP-Only | Secure session management without client-side persistence. |
+| **Database Integrity** | Postgres RLS | Strict Row-Level Security for multi-tenant data isolation. |
+| **Telemetry Recalibration** | Dynamic Thresholds | Real-time adjustment of ML sensitivity by authorized Admins. |
+| **Cryptographic Rotation** | API Key Cycling | Instant invalidation of leaked or stale ingestion tokens. |
 
 ---
 
-## ⚙️ Deployment & Setup
+## ⚙️ DEPLOYMENT SOP (Standard Operating Procedure)
 
-### Requirements
-- Node.js v18+
-- Python 3.9+
-- Redis Server
-- PostgreSQL (Supabase recommended)
+To initialize the KavachX ecosystem, synchronize the primary services in order:
 
-### 1. Inception (ML Service)
+### 1. Inception (ML COGNITIVE ENGINE)
 ```bash
 cd ML
-python -m venv venv
-source venv/bin/activate # or venv\Scripts\activate
 pip install -r requirements.txt
 python app.py
 ```
 
-### 2. Core (Backend)
+### 2. Core (RESILIENCE GATEWAY)
 ```bash
 cd backend
 npm install
 npm run dev
 ```
 
-### 3. Interface (Frontend)
+### 3. Interface (OPERATOR HUB)
 ```bash
 cd frontend
 npm install
@@ -156,26 +116,10 @@ npm run dev
 
 ---
 
-## 🔑 Environment Configuration
+## 🤝 PROJECT CONTRIBUTORS
 
-Ensure `.env` files are configured in both `backend` and `frontend` directories.
-
-**Backend (.env)**:
-```env
-PORT=5001
-JWT_SECRET=your_secret
-DATABASE_URI=your_postgres_uri
-REDIS_URL=redis://localhost:6379
-BREVO_API_KEY=your_key
-ML_API_URL=http://localhost:5000/api/ml/analyze
-```
+*Names to be provided by the Command Lead...*
 
 ---
-
-## 🤝 Contributors
-
-*Names to be provided...*
-
----
-*Created for Advanced Agentic Coding.*
-*Team Cache Me If You Can*
+**DESIGNED FOR ADVANCED AGENTIC CODING**  
+*Team: Cache Me If You Can*
