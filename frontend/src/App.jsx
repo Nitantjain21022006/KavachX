@@ -52,7 +52,7 @@ function App() {
                         <Route path="/alerts" element={<ProtectedRoute><Layout><Alerts /></Layout></ProtectedRoute>} />
                         <Route path="/alerts/:id" element={<ProtectedRoute><Layout><AlertDetails /></Layout></ProtectedRoute>} />
                         <Route path="/metrics" element={<ProtectedRoute><Layout><SystemMetrics /></Layout></ProtectedRoute>} />
-                        <Route path="/settings" element={<ProtectedRoute><Layout><Settings /></Layout></ProtectedRoute>} />
+                        <Route path="/settings" element={<ProtectedRoute allowedRoles={['ADMIN']}><Layout><Settings /></Layout></ProtectedRoute>} />
 
                         {/* Catch-all redirect to Landing */}
                         <Route path="*" element={<Navigate to="/" replace />} />

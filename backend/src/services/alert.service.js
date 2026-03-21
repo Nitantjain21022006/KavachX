@@ -69,7 +69,16 @@ export const createAlert = async (alertData) => {
 
         if (normalizedSeverity === 'HIGH') {
             try {
-                await sendAlertEmail(process.env.BREVO_USER || 'admin@cyber.res', alert);
+                // Fetch email settings from DB
+                const settingsQuery = 'SELECT admin_email, email_enabled FROM settings_notifications ORDER BY updated_at DESC LIMIT 1';
+                const { rows: settingsRows } = await pool.query(settingsQuery);
+                const emailSettings = settingsRows[0];
+
+                if (emailSettings && emailSettings.email_enabled) {
+                    await sendAlertEmail(emailSettings.admin_email, alert);
+                } else {
+                    console.log('[Alert Service] Email disabled by governance policy');
+                }
             } catch (emailError) {
                 console.error('Non-critical: Alert email failed:', emailError.message);
             }
