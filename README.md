@@ -1,95 +1,181 @@
-# Cyber-Resilient Infrastructure Platform (CRIP)
+# 🛡️ KavachX: Cyber-Resilient Infrastructure Platform
 
-A high-fidelity security monitoring and resilience platform designed for critical infrastructure: **Healthcare**, **Agriculture**, and **Urban Systems**. The platform leverages real-time telemetry, 15-feature Machine Learning anomaly detection, and automated response protocols to maintain operational integrity against cyber threats.
+[![Cybersecurity](https://img.shields.io/badge/Security-Red-red?style=for-the-badge&logo=shippable&logoColor=white)](https://github.com/OddlyEvenn/KavachX)
+[![Framework](https://img.shields.io/badge/Framework-React--Vite-blue?style=for-the-badge&logo=react)](https://reactjs.org/)
+[![Backend](https://img.shields.io/badge/Backend-Node--Express-339933?style=for-the-badge&logo=node.js)](https://nodejs.org/)
+[![Database](https://img.shields.io/badge/Database-Postgres--Supabase-3ECF8E?style=for-the-badge&logo=supabase)](https://supabase.com/)
 
-## 🚀 Key Features
+**KavachX** is a next-generation security monitoring and autonomous resilience platform engineered for critical infrastructure preservation. It provides real-time oversight for three primary sectors: **Healthcare**, **Agriculture**, and **Urban Systems**, utilizing advanced 15-feature XGBoost Machine Learning to detect, classify, and mitigate cyber-kinetic threats.
 
-- **15-Feature ML Integration**: Advanced anomaly detection and attack classification (DDoS, MITM, Injection, etc.) using high-fidelity IoT telemetry.
-- **Anomaly Stream**: A real-time, paginated monitor feed for intercepting and analyzing infrastructure events.
-- **Telemetry Lab**: Deep-dive hardware utilization analytics (CPU, Memory, Network) with interactive "Instrument Gauge" visualizations.
-- **Admin Command Center**: Centralized governance hub for managing security thresholds, rotating API keys, and sector oversight.
-- **Sector Dossiers**: Instant generation of professional, high-fidelity PDF reports for executive auditing.
-- **Automated Mitigation**: Trigger-based responses including IP blocking and user isolation.
+---
 
-## 🛠️ Tech Stack
+## 🏗️ System Architecture
 
-### Frontend
-- **Framework**: [React](https://reactjs.org/) + [Vite](https://vitejs.dev/)
-- **Styling**: [Tailwind CSS](https://tailwindcss.com/)
-- **Visualization**: [Recharts](https://recharts.org/)
-- **Icons**: [Lucide React](https://lucide.dev/)
+KavachX operates on a distributed 3-tier architecture designed for high throughput and low-latency inference.
 
-### Backend
-- **Runtime**: [Node.js](https://nodejs.org/) + [Express](https://expressjs.com/)
-- **Database**: [Supabase](https://supabase.com/) (PostgreSQL)
-- **Buffer Layer**: [Redis](https://redis.io/)
-- **Email**: [Brevo](https://www.brevo.com/) (SMTP Relay)
+```mermaid
+graph TD
+    subgraph "Edge / Simulation"
+        AstraX["AstraX (Threat Simulator)"]
+    end
 
-### ML Service
-- **Engine**: [Python](https://www.python.org/) + [Flask](https://flask.palletsprojects.com/)
-- **Model**: XGBoost Classification (15 FEATURES)
+    subgraph "Resilience Layer (Backend)"
+        API["Express.js API"]
+        Redis["Redis (Contextual Memory)"]
+        EventProc["Event Processing Pipeline"]
+    end
 
-## ⚙️ Setup & Local Development
+    subgraph "Cognitive Engine (ML)"
+        MLApp["Python/Flask ML Service"]
+        XGB["XGBoost (15-Feature Inference)"]
+    end
 
-To run the full platform locally, you will need three terminal instances.
+    subgraph "UI Layer (KavachX Hub)"
+        Dashboard["Operator Dashboard"]
+        LiveFeed["Anomaly Stream (SSE)"]
+    end
 
-### 1. ML Service (Inference Engine)
+    subgraph "Persistence"
+        DB["PostgreSQL (Supabase)"]
+    end
+
+    AstraX -- "36-Feature Telemetry" --> API
+    API --> EventProc
+    EventProc -- "Context Update" --> Redis
+    EventProc -- "Inference Request" --> MLApp
+    MLApp --> XGB
+    XGB -- "Risk/Severity Classification" --> MLApp
+    MLApp -- "ML-Augmented Data" --> EventProc
+    EventProc -- "Store Alert/Event" --> DB
+    Dashboard <--> API
+    API -- "Live Proxy" --> LiveFeed
+```
+
+---
+
+## 📊 Data Model (ER Diagram)
+
+The core data structure ensures strict relationship integrity between operational events, classified alerts, and governance policies.
+
+```mermaid
+erDiagram
+    USERS ||--o{ ALERTS : "resolves"
+    ALERTS }|--|| SECTORS : "reported_on"
+    EVENTS }|--|| SECTORS : "belongs_to"
+    USERS ||--o{ SECTORS : "owns"
+    OTP_VERIFICATIONS ||--|| USERS : "verifies"
+    SETTINGS_SECURITY ||--o{ ALERTS : "governs"
+    
+    USERS {
+        uuid id PK
+        string email
+        string role "ADMIN | ANALYST | SECTOR_OWNER"
+        string sector "HEALTHCARE | AGRICULTURE | URBAN"
+        string name
+        boolean is_verified
+    }
+    
+    ALERTS {
+        uuid id PK
+        string sector
+        string type "DDoS | MITM | RANSOMWARE | etc."
+        string severity "HIGH | MEDIUM | LOW"
+        float risk_score
+        string status "ACTIVE | RESOLVED"
+        string resolution_type "AUTOMATED | MANUAL"
+        uuid resolved_by FK
+    }
+
+    EVENTS {
+        uuid id PK
+        string sector
+        string type
+        string severity
+        jsonb metadata "Raw Telemetry & 36 Features"
+    }
+
+    SECTORS {
+        uuid id PK
+        string name "HEALTHCARE | AGRICULTURE | URBAN"
+        boolean is_enabled
+        uuid owner_id FK
+    }
+```
+
+---
+
+## 🔬 Cognitive Intelligence (ML)
+
+The heart of KavachX is its **15-Feature Ensemble Classifier**, which reduces 36 raw telemetry points into actionable security heuristics.
+
+-   **Raw Ingestion**: 36 diverse features (Packet counts, Entropy, Authentication states, SSL validations, etc.).
+-   **Ensemble Engine**: XGBoost model performing multi-output prediction for Attack Detection and Attack Classification simultaneously.
+-   **Risk Scoring**: Dynamic calculation based on `anomaly_score`, `confidence`, and `attack_velocity`.
+
+---
+
+## ⚡ Key Modules
+
+1. **AstraX Simulator**: A precision tool for stress-testing infrastructure by injecting simulated multi-vector attacks.
+2. **Telemetry Lab**: Interactive grid-monitoring for hardware and network utilization metrics.
+3. **Autonomous Defense**: Governance-driven "Self-Healing" that executes mitigations (IP blocking, account lockout) without human intervention based on ML severity.
+4. **Sector Dossiers**: Instant PDF auditing reports generated from live threat databases.
+
+---
+
+## ⚙️ Deployment & Setup
+
+### Requirements
+- Node.js v18+
+- Python 3.9+
+- Redis Server
+- PostgreSQL (Supabase recommended)
+
+### 1. Inception (ML Service)
 ```bash
-cd ml_service
+cd ML
+python -m venv venv
+source venv/bin/activate # or venv\Scripts\activate
 pip install -r requirements.txt
 python app.py
 ```
 
-### 2. Backend (Logic & Persistence)
+### 2. Core (Backend)
 ```bash
 cd backend
 npm install
-# Create .env based on the "Environment Variables" section below
 npm run dev
 ```
 
-### 3. Frontend (Operator Dashboard)
+### 3. Interface (Frontend)
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-## 🔑 Environment Variables
+---
 
-### Backend (.env)
+## 🔑 Environment Configuration
+
+Ensure `.env` files are configured in both `backend` and `frontend` directories.
+
+**Backend (.env)**:
 ```env
 PORT=5001
-JWT_SECRET=your_jwt_secret
-SUPABASE_URL=your_supabase_url
-SUPABASE_ANON_KEY=your_supabase_anon_key
+JWT_SECRET=your_secret
+DATABASE_URI=your_postgres_uri
 REDIS_URL=redis://localhost:6379
-BREVO_API_KEY=your_brevo_key
-BREVO_USER=your_email@domain.com
+BREVO_API_KEY=your_key
 ML_API_URL=http://localhost:5000/api/ml/analyze
-FRONTEND_URL=http://localhost:5173
 ```
-
-### Frontend (.env)
-```env
-VITE_API_URL=http://localhost:5001/api
-```
-
-## 🛡️ Authentication & Access
-
-- **Test Accounts**: Please use the **Register** flow to create your first `ADMIN` account.
-- **Verification**: Email OTPs are dispatched via Brevo for registration and password resets.
-- **Security**: No sensitive data is stored in `localStorage`; all sessions are handled via **HTTP-only Cookies**.
-
-## ⚠️ Error Handling & Resilience
-
-- **ML Safe-Mode**: The backend automatically falls back to a deterministic "Safe-Mode" if the ML service is unreachable.
-- **Robust Parsing**: Every ingestion cycle features robust error handling to prevent data corruption during stream analysis.
-- **Database RLS**: All Supabase tables are protected by Row-Level Security policies.
-
-## 🔒 Confidentiality Notice
-**NO SECRETS** (API keys, Supabase credentials, etc.) are committed to this repository. All sensitive configurations are managed via environment variables and are excluded via `.gitignore`.
 
 ---
-*Developed for Advanced Agentic Coding Challenge.*
+
+## 🤝 Contributors
+
+*Names to be provided...*
+
+---
+*Created for Advanced Agentic Coding.*
 *Team Cache Me If You Can*
