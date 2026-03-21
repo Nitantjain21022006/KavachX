@@ -202,17 +202,15 @@ npm run dev
 
 ---
 
+---
+
 <div align="center">
 
-**[ 🛡️ SECURE ] [ ⚡ RESILIENT ] [ 🧠 AUTONOMOUS ]**
+**[ 🛡️ SECURE ] &nbsp; [ ⚡ RESILIENT ] &nbsp; [ 🧠 AUTONOMOUS ]**
 
-```text
---------------------------------------------------------------------------------
-[ KAVACH-X CORE ] [ SECURITY PROTOCOL: V4.0 ] [ AUTHORIZED ACCESS ONLY ]
---------------------------------------------------------------------------------
-```
+[![Made with Love](https://img.shields.io/badge/Made%20with-Love-ff69b4?style=for-the-badge)](https://github.com/OddlyEvenn/KavachX)
+[![Advanced Agentic Coding](https://img.shields.io/badge/Project-Advanced%20Agentic%20Coding-blueviolet?style=for-the-badge)](https://github.com/OddlyEvenn/KavachX)
 
-*DESIGNED FOR THE ADVANCED AGENTIC CODING CHALLENGE*  
-*Team: Cache Me If You Can*
+*Developed by **Nitant Jain** & Team: **Cache Me If You Can***
 
 </div>
