@@ -211,6 +211,6 @@ npm run dev
 [![Made with Love](https://img.shields.io/badge/Made%20with-Love-ff69b4?style=for-the-badge)](https://github.com/OddlyEvenn/KavachX)
 [![Advanced Agentic Coding](https://img.shields.io/badge/Project-Advanced%20Agentic%20Coding-blueviolet?style=for-the-badge)](https://github.com/OddlyEvenn/KavachX)
 
-*Developed by **Nitant Jain** & Team: **Cache Me If You Can***
+*Developed by Team: **Cache Me If You Can***
 
 </div>
