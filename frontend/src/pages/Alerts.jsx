@@ -119,33 +119,56 @@ const Alerts = () => {
 
     return (
         <div className="space-y-8 pb-20 relative">
-            {/* Cyber Grid Background */}
-            <div className="fixed inset-0 pointer-events-none opacity-[0.03] z-[-1]" style={{
-                backgroundImage: `linear-gradient(#00f3ff 1px, transparent 1px), linear-gradient(90deg, #00f3ff 1px, transparent 1px)`,
-                backgroundSize: '40px 40px'
+            <style>
+                {`
+                    @keyframes scanline {
+                        0% { transform: translateY(-100%); }
+                        100% { transform: translateY(100vh); }
+                    }
+                    @keyframes pulse-glow {
+                        0%, 100% { box-shadow: 0 0 10px rgba(0, 243, 255, 0.2); }
+                        50% { box-shadow: 0 0 25px rgba(0, 243, 255, 0.6); }
+                    }
+                `}
+            </style>
+
+            {/* Scanning Blue Line Overlay */}
+            <div 
+                className="fixed inset-0 pointer-events-none z-[9999] opacity-30 mix-blend-screen"
+                style={{
+                    background: 'linear-gradient(to bottom, transparent 40%, rgba(0, 243, 255, 0.4) 50%, transparent 60%)',
+                    height: '20vh',
+                    animation: 'scanline 8s linear infinite',
+                }}
+            />
+
+            {/* Subtle Grid Background */}
+            <div className="fixed inset-0 pointer-events-none opacity-20 z-[-1]" style={{
+                backgroundImage: `linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)`,
+                backgroundSize: '30px 30px'
             }} />
 
-            {/* Header section */}
-            <div className="relative border-b border-[#00f3ff]/20 pb-6 mb-8 group overflow-hidden">
-                {/* Horizontal Scanning Line */}
-                <div className="absolute top-0 left-0 h-[1px] w-full bg-[#00f3ff] animate-[scan_3s_ease-in-out_infinite] opacity-50 shadow-[0_0_10px_#00f3ff]" />
-                <div className="flex flex-col gap-2 relative z-10">
-                    <div className="flex items-center gap-3 text-[#00f3ff] text-[10px] sm:text-[12px] font-black uppercase tracking-[0.4em] mb-1 font-mono">
-                        <Crosshair size={18} className="animate-[spin_4s_linear_infinite]" />
-                        Infrastructure Security Operations <span className="text-[#ff003c] animate-pulse">:: ACTIVE</span>
+            {/* Clean Modern Header section */}
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+                <div>
+                    <div className="flex items-center gap-2 text-[#00f3ff] text-xs font-semibold tracking-widest uppercase mb-2">
+                        <Activity size={14} className="animate-pulse" />
+                        Infrastructure Security Operations <span className="text-white/40 px-2">|</span> <span className="text-[#00ff88]">Active Monitoring</span>
                     </div>
-                    <h1 className="text-4xl md:text-6xl font-black text-white tracking-widest uppercase italic flex items-center gap-4 drop-shadow-[0_0_15px_rgba(0,243,255,0.4)]">
-                        Threat <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00f3ff] to-[#ff003c]">Intelligence</span>
+                    <h1 className="text-4xl lg:text-5xl font-bold tracking-tight text-white mb-2">
+                        Threat Intelligence
                     </h1>
-                    <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.3em] font-mono mt-2 flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-[#00f3ff] animate-ping" />
-                        Real-time classification and response tracking matrix
+                    <p className="text-gray-400 text-sm max-w-2xl">
+                        Real-time classification and response tracking matrix. Monitor and resolve aggregated security alerts across your network ecosystem.
                     </p>
                 </div>
             </div>
 
-            {/* Extreme Cyber Top Menu Bar */}
-            <div className="flex flex-wrap gap-2 lg:flex-nowrap items-center justify-between relative z-10 mb-10 overflow-x-auto pb-4 custom-scrollbar">
+            {/* Sleek Navigation Tabs */}
+            <div className="bg-white/[0.02] border border-white/[0.05] rounded-xl p-1.5 backdrop-blur-md mb-8 flex flex-wrap lg:flex-nowrap gap-1 relative overflow-hidden">
+                {/* Internal container glow */}
+                <div className="absolute inset-0 bg-gradient-to-r from-[#00f3ff]/5 via-transparent to-[#ff003c]/5 pointer-events-none" />
+                
                 {ATTACK_CLASSES.map((atk) => {
                     const isActive = activeClass === atk.id;
                     const Icon = atk.icon;
@@ -153,38 +176,29 @@ const Alerts = () => {
                         <button
                             key={atk.id}
                             onClick={() => setActiveClass(atk.id)}
-                            className={`flex flex-1 items-center justify-center gap-3 px-6 py-4 transition-all duration-300 relative group overflow-hidden border min-w-[140px] ${
+                            className={`relative flex flex-1 items-center justify-center gap-2.5 px-4 py-3.5 rounded-lg transition-all duration-300 min-w-[130px] overflow-hidden group ${
                                 isActive 
-                                ? 'bg-black/80 shadow-[0_0_20px_rgba(0,0,0,0.8)]' 
-                                : 'bg-black/40 hover:bg-black/60 border-white/5 opacity-70 hover:opacity-100'
+                                ? 'bg-[#00f3ff]/10 text-white shadow-lg' 
+                                : 'text-gray-500 hover:text-gray-200 hover:bg-white/5'
                             }`}
-                            style={{
-                                borderColor: isActive ? atk.color : 'rgba(255,255,255,0.05)',
-                                clipPath: 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)'
-                            }}
+                            style={isActive ? { animation: 'pulse-glow 4s infinite' } : {}}
                         >
-                            {/* Neon glow underneath */}
+                            {/* Active Tab Highlight Background */}
                             {isActive && (
-                                <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ background: `radial-gradient(circle at center, ${atk.color}, transparent 70%)` }} />
+                                <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#00f3ff]/20 opacity-50 pointer-events-none" />
                             )}
                             
                             <Icon 
-                                size={20} 
-                                className={`transition-transform duration-300 z-10 ${isActive ? 'scale-110 drop-shadow-[0_0_8px_currentColor]' : 'group-hover:scale-110'}`} 
-                                style={{ color: isActive ? atk.color : '#666' }} 
+                                size={18} 
+                                className={`transition-all z-10 ${isActive ? 'text-[#00f3ff] scale-110 drop-shadow-[0_0_8px_rgba(0,243,255,0.8)]' : 'group-hover:scale-110'}`} 
                             />
-                            <span 
-                                className={`text-[12px] font-black uppercase tracking-[0.2em] font-mono z-10 ${isActive ? 'text-white drop-shadow-[0_0_5px_currentColor]' : 'text-gray-500 group-hover:text-gray-300'}`}
-                            >
+                            <span className={`text-sm font-semibold tracking-wide z-10 ${isActive ? 'text-white' : ''}`}>
                                 {atk.label}
                             </span>
-                            
-                            {/* Cyber decoration lines */}
+
+                            {/* Active Tab Bottom Indicator */}
                             {isActive && (
-                                <>
-                                    <div className="absolute top-0 left-0 w-2 h-[2px]" style={{ backgroundColor: atk.color }} />
-                                    <div className="absolute bottom-0 right-0 w-2 h-[2px]" style={{ backgroundColor: atk.color }} />
-                                </>
+                                <div className="absolute bottom-0 left-0 w-full h-[2px] bg-[#00f3ff] shadow-[0_0_10px_#00f3ff]" />
                             )}
                         </button>
                     )
