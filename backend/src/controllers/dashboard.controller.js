@@ -1,4 +1,5 @@
 import pool from '../utils/db.js';
+import { sendDossierEmail } from '../utils/mailer.js';
 
 /**
  * GET /api/dashboard
@@ -202,6 +203,43 @@ export const getDashboardData = async (req, res) => {
         });
     } catch (error) {
         console.error('[Dashboard] Error fetching dashboard data:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+/**
+ * POST /api/dashboard/send-dossier
+ * Emails the sector intelligence dossier to the sector owner.
+ */
+export const emailDossier = async (req, res) => {
+    const { sectorId, sectorName, health, risk, incidents } = req.body;
+
+    try {
+        // Find the sector owner's email from the users table
+        const ownerQuery = `
+            SELECT email, name FROM users
+            WHERE role = 'SECTOR_OWNER' AND UPPER(sector) = UPPER($1) AND is_verified = true
+            LIMIT 1
+        `;
+        const { rows } = await pool.query(ownerQuery, [sectorId]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: `No verified sector owner found for sector: ${sectorId}`
+            });
+        }
+
+        const ownerEmail = rows[0].email;
+        const result = await sendDossierEmail(ownerEmail, { sectorName, health, risk, incidents });
+
+        if (result.success) {
+            res.json({ success: true, message: `Dossier dispatched to ${ownerEmail}` });
+        } else {
+            res.status(502).json({ success: false, message: 'Email delivery failed', error: result.error });
+        }
+    } catch (error) {
+        console.error('[Dashboard] emailDossier error:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 };

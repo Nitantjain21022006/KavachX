@@ -3,11 +3,13 @@ import {
     ShieldCheck, Zap, Activity, AlertTriangle, ArrowUpRight, Download,
     X, ChevronRight, Network, Terminal, Database,
     Eye, Radio, BarChart2, RefreshCw, ShieldAlert, TrendingUp, Clock,
-    Lock, Globe
+    Lock, Globe, Mail, CheckCircle, Loader
 } from 'lucide-react';
 import { EventThroughputChart, SeverityDistributionChart, AttackVectorChart, SectorRadarChart, StatusDonutChart } from '../components/Charts';
 import api from '../api/axiosInstance';
 import { useAuth } from '../context/AuthContext';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DESIGN SYSTEM TOKENS (HCI Consistency)
@@ -237,9 +239,12 @@ const TerminalFeed = ({ alerts }) => {
 // SECTOR DOSSIER MODAL — responsive, scrollable
 // ─────────────────────────────────────────────────────────────────────────────
 const SectorDossierModal = ({ sector, onClose }) => {
-    const handlePrint = () => window.print();
+    const { user } = useAuth();
     const rc = riskColor(sector.risk);
     const docRef = useRef(null);
+    const [pdfLoading, setPdfLoading] = useState(false);
+    const [emailLoading, setEmailLoading] = useState(false);
+    const [emailStatus, setEmailStatus] = useState(null); // 'success' | 'error' | null
 
     // Close on backdrop click
     const handleBackdrop = (e) => { if (e.target === e.currentTarget) onClose(); };
@@ -250,6 +255,57 @@ const SectorDossierModal = ({ sector, onClose }) => {
         window.addEventListener('keydown', handler);
         return () => window.removeEventListener('keydown', handler);
     }, [onClose]);
+
+    // ── PDF Generation ────────────────────────────────────────────────────────
+    const handleDownloadPDF = async () => {
+        if (!docRef.current || pdfLoading) return;
+        setPdfLoading(true);
+        try {
+            const canvas = await html2canvas(docRef.current, {
+                backgroundColor: '#030512',
+                scale: 2,
+                useCORS: true,
+                logging: false,
+            });
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            const pdfW = pdf.internal.pageSize.getWidth();
+            const pdfH = (canvas.height * pdfW) / canvas.width;
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfW, pdfH);
+            const dateStr = new Date().toISOString().slice(0, 10);
+            pdf.save(`KavachX_Dossier_${sector.name.replace(/\s+/g, '_')}_${dateStr}.pdf`);
+        } catch (err) {
+            console.error('[Dossier PDF]', err);
+        } finally {
+            setPdfLoading(false);
+        }
+    };
+
+    // ── Email to Sector Owner ─────────────────────────────────────────────────
+    const handleEmailDossier = async () => {
+        if (emailLoading) return;
+        setEmailLoading(true);
+        setEmailStatus(null);
+        try {
+            await api.post('/dashboard/send-dossier', {
+                sectorId: sector.id,
+                sectorName: sector.name,
+                health: sector.health,
+                risk: sector.risk,
+                incidents: sector.incidents,
+            });
+            setEmailStatus('success');
+            setTimeout(() => setEmailStatus(null), 4000);
+        } catch (err) {
+            console.error('[Dossier Email]', err);
+            setEmailStatus('error');
+            setTimeout(() => setEmailStatus(null), 4000);
+        } finally {
+            setEmailLoading(false);
+        }
+    };
+
+    const canEmail = user?.role === 'ADMIN' || user?.role === 'SECTOR_OWNER';
 
     const TELEMETRY = [
         { label: 'Encryption Layer', value: 'AES-256-GCM' },
@@ -396,21 +452,60 @@ const SectorDossierModal = ({ sector, onClose }) => {
                 </div>
 
                 {/* ── FOOTER ACTIONS (sticky) ───────────────── */}
-                <div className="shrink-0 p-5 border-t border-white/5 flex gap-3 bg-black/30 print:hidden">
-                    <button
-                        onClick={handlePrint}
-                        className="flex-1 py-3 rounded-xl font-black uppercase tracking-[0.15em] text-[9px] flex items-center justify-center gap-2 transition-all hover:opacity-90 group"
-                        style={{ background: `linear-gradient(135deg, ${DS.primary}, #009dab)`, color: '#000' }}
-                    >
-                        <Download size={14} className="group-hover:animate-bounce" />
-                        Export Classified PDF
-                    </button>
-                    <button
-                        onClick={onClose}
-                        className="px-6 py-3 rounded-xl font-black uppercase tracking-[0.15em] text-[9px] text-gray-400 hover:text-white hover:bg-white/8 transition-all border border-white/5"
-                    >
-                        Dismiss
-                    </button>
+                <div className="shrink-0 p-5 border-t border-white/5 bg-black/30 print:hidden space-y-3">
+                    {/* Email status toast */}
+                    {emailStatus && (
+                        <div
+                            className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-[9px] font-black uppercase tracking-wider animate-in slide-in-from-top-2 duration-300"
+                            style={{
+                                background: emailStatus === 'success' ? 'rgba(57,255,20,0.1)' : 'rgba(255,0,60,0.1)',
+                                border: `1px solid ${emailStatus === 'success' ? 'rgba(57,255,20,0.3)' : 'rgba(255,0,60,0.3)'}`,
+                                color: emailStatus === 'success' ? '#39ff14' : '#ff003c',
+                            }}
+                        >
+                            <CheckCircle size={13} />
+                            {emailStatus === 'success' ? 'Dossier dispatched to sector owner successfully' : 'Email dispatch failed — check backend logs'}
+                        </div>
+                    )}
+                    <div className="flex gap-3">
+                        {/* PDF Download */}
+                        <button
+                            onClick={handleDownloadPDF}
+                            disabled={pdfLoading}
+                            className="flex-1 py-3 rounded-xl font-black uppercase tracking-[0.15em] text-[9px] flex items-center justify-center gap-2 transition-all hover:opacity-90 group disabled:opacity-60"
+                            style={{ background: `linear-gradient(135deg, ${DS.primary}, #009dab)`, color: '#000' }}
+                            aria-label="Download dossier as PDF"
+                        >
+                            {pdfLoading ? <Loader size={14} className="animate-spin" /> : <Download size={14} className="group-hover:translate-y-0.5 transition-transform" />}
+                            {pdfLoading ? 'Generating...' : 'Export PDF'}
+                        </button>
+
+                        {/* Email to Sector Owner */}
+                        {canEmail && (
+                            <button
+                                onClick={handleEmailDossier}
+                                disabled={emailLoading}
+                                className="flex-1 py-3 rounded-xl font-black uppercase tracking-[0.15em] text-[9px] flex items-center justify-center gap-2 transition-all hover:opacity-90 group disabled:opacity-60 border"
+                                style={{
+                                    background: 'rgba(57,255,20,0.08)',
+                                    borderColor: 'rgba(57,255,20,0.2)',
+                                    color: '#39ff14',
+                                }}
+                                aria-label="Mail dossier to sector owner"
+                            >
+                                {emailLoading ? <Loader size={14} className="animate-spin" /> : <Mail size={14} className="group-hover:scale-110 transition-transform" />}
+                                {emailLoading ? 'Dispatching...' : 'Mail to Owner'}
+                            </button>
+                        )}
+
+                        <button
+                            onClick={onClose}
+                            className="px-5 py-3 rounded-xl font-black uppercase tracking-[0.15em] text-[9px] text-gray-400 hover:text-white hover:bg-white/8 transition-all border border-white/5"
+                            aria-label="Close dossier modal"
+                        >
+                            Dismiss
+                        </button>
+                    </div>
                 </div>
 
                 <div className="shrink-0 py-3 text-center text-[7px] text-gray-700 font-black uppercase tracking-[0.5em] bg-black/40 print:block">
