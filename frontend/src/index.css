@@ -155,4 +155,27 @@
 .animate-grid-drift {
   animation: grid-drift 12s linear infinite;
 }
+
+/* ── Custom cyber scrollbar ───────────────────────────── */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 243, 255, 0.18) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 243, 255, 0.18);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 243, 255, 0.35);
+}
 
