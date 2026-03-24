@@ -100,8 +100,11 @@ const StatCounter = ({ value, suffix = '', label }) => {
     const [count, ref] = useCounter(value);
     return (
         <div ref={ref} className="text-center min-w-0 px-4">
-            <div className="text-4xl md:text-5xl font-black font-mono italic mb-2 text-white leading-none truncate">
-                {count.toLocaleString()}{suffix}
+            <div className="text-4xl md:text-5xl font-black font-mono italic mb-2 text-white leading-none">
+                {count > 10000 
+                    ? Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(count) 
+                    : count.toLocaleString()}
+                {suffix}
             </div>
             <div className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-600">{label}</div>
         </div>
@@ -218,41 +221,41 @@ const Landing = () => {
                     {/* Section header */}
                     <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-6">
                         <div>
-                            <span className="text-[#2176ff] font-black text-[10px] uppercase tracking-[0.4em] mb-3 block">Core Intelligence Engine</span>
+                            <span className="text-[#0070ff] font-black text-[10px] uppercase tracking-[0.4em] mb-3 block">Core Intelligence Engine</span>
                             <h2 className="text-4xl md:text-5xl font-black text-white leading-tight">
-                                Meet <span className="text-[#2176ff]" style={{ textShadow: '0 0 20px rgba(33,118,255,0.5)' }}>AstraX</span>
+                                Meet <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00f3ff] to-[#0070ff] drop-shadow-[0_0_20px_rgba(0,243,255,0.4)]">AstraX</span>
                             </h2>
                             <p className="text-gray-500 mt-4 max-w-xl leading-relaxed text-sm">
                                 AstraX is the autonomous neural anomaly detection engine at the heart of KavachX.
                                 Trained on millions of industrial sensor events, it classifies threats with sub-second precision.
                             </p>
                         </div>
-                        <div className="h-px flex-1 bg-gradient-to-r from-[#2176ff]/30 to-transparent hidden md:block mb-3" />
+                        <div className="h-px flex-1 bg-gradient-to-r from-[#0070ff]/30 to-transparent hidden md:block mb-3" />
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
                         {/* Engine visual */}
                         <div className="relative flex items-center justify-center py-10">
                             {/* Outer rings */}
-                            <div className="absolute w-64 h-64 rounded-full border border-[#2176ff]/15 animate-spin" style={{ animationDuration: '20s' }} />
+                            <div className="absolute w-64 h-64 rounded-full border border-[#0070ff]/15 animate-spin" style={{ animationDuration: '20s' }} />
                             <div className="absolute w-48 h-48 rounded-full border border-[#00f3ff]/15 animate-spin" style={{ animationDuration: '12s', animationDirection: 'reverse' }} />
                             <div className="absolute w-32 h-32 rounded-full border border-[#00f3ff]/10 animate-spin" style={{ animationDuration: '8s' }} />
                             {/* Dots on rings */}
                             <div className="absolute w-64 h-64 rounded-full" style={{ animation: 'spin 20s linear infinite' }}>
-                                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-[#2176ff] shadow-[0_0_8px_#2176ff]" />
+                                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-[#0070ff] shadow-[0_0_8px_#0070ff]" />
                             </div>
                             <div className="absolute w-48 h-48 rounded-full" style={{ animation: 'spin 12s linear infinite reverse' }}>
                                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-[#00f3ff] shadow-[0_0_8px_#00f3ff]" />
                             </div>
                             {/* Core */}
-                            <div className="relative z-10 flex h-20 w-20 items-center justify-center rounded-2xl bg-[#2176ff]/10 border border-[#2176ff]/30 shadow-[0_0_40px_rgba(33,118,255,0.3)]">
-                                <Brain size={36} className="text-[#2176ff] animate-pulse" />
+                            <div className="relative z-10 flex h-20 w-20 items-center justify-center rounded-2xl bg-[#0070ff]/10 border border-[#0070ff]/30 shadow-[0_0_40px_rgba(0,112,255,0.3)]">
+                                <Brain size={36} className="text-[#0070ff] animate-pulse" />
                             </div>
                             {/* Floating labels */}
                             {[
                                 { label: 'DDoS', color: '#ff003c', pos: '-top-4 left-4' },
                                 { label: 'Phishing', color: '#ff9900', pos: '-top-4 right-4' },
-                                { label: 'Injection', color: '#2176ff', pos: '-bottom-4 left-8' },
+                                { label: 'Injection', color: '#0070ff', pos: '-bottom-4 left-8' },
                                 { label: 'Anomaly', color: '#00f3ff', pos: '-bottom-4 right-8' },
                             ].map(f => (
                                 <div key={f.label} className={`absolute ${f.pos} text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded border`}
@@ -266,10 +269,10 @@ const Landing = () => {
                         <div className="space-y-5">
                             {[
                                 {
-                                    icon: <Brain className="text-[#2176ff]" size={24} />,
+                                    icon: <Brain className="text-[#0070ff]" size={24} />,
                                     title: 'Deep Neural Classification',
                                     desc: 'Multi-layer LSTM + transformer architecture processes raw sensor telemetry and classifies attack vectors — DDoS, Phishing, Port Scan, Injection, Ransomware, Anomaly — with 99.3% accuracy.',
-                                    color: '#2176ff'
+                                    color: '#0070ff'
                                 },
                                 {
                                     icon: <Activity className="text-[#00f3ff]" size={24} />,
@@ -315,12 +318,12 @@ const Landing = () => {
 
                     <div className="relative">
                         {/* Vertical line */}
-                        <div className="absolute left-1/2 top-0 bottom-0 w-px bg-gradient-to-b from-[#00f3ff]/20 via-[#2176ff]/20 to-transparent -translate-x-1/2 hidden md:block" />
+                        <div className="absolute left-1/2 top-0 bottom-0 w-px bg-gradient-to-b from-[#00f3ff]/20 via-[#0070ff]/20 to-transparent -translate-x-1/2 hidden md:block" />
 
                         <div className="space-y-10">
                             {[
                                 { step: '01', title: 'Sensor Ingestion', desc: 'Raw telemetry streams from IoT sensors, network probes, and system monitors across all three sectors flow into KavachX\'s ingestion pipeline at sub-millisecond intervals.', icon: <Radio size={20} />, color: '#00f3ff', side: 'left' },
-                                { step: '02', title: 'AstraX Detection', desc: 'The neural engine processes each packet through its classification model — identifying attack vectors, anomalies, and lateral movement with explainable confidence scores.', icon: <Brain size={20} />, color: '#2176ff', side: 'right' },
+                                { step: '02', title: 'AstraX Detection', desc: 'The neural engine processes each packet through its classification model — identifying attack vectors, anomalies, and lateral movement with explainable confidence scores.', icon: <Brain size={20} />, color: '#0070ff', side: 'right' },
                                 { step: '03', title: 'Threat Classification', desc: 'Detected events are categorized by type (DDoS, Phishing, Ransomware, etc.), severity (LOW → HIGH), and sector origin — then logged to the immutable audit trail.', icon: <Terminal size={20} />, color: '#ff9900', side: 'left' },
                                 { step: '04', title: 'Autonomous Response', desc: 'If the risk score exceeds threshold, the Autonomous Resilience Engine (A.R.E.) fires — quarantining IPs, alerting sector owners, and triggering circuit-breaks.', icon: <Zap size={20} />, color: '#ff003c', side: 'right' },
                                 { step: '05', title: 'Intelligence Dossier', desc: 'Sector operators receive a cryptographically signed intelligence dossier: health score, threat indicators, CVE exposure, and executive summary — ready to act on.', icon: <Database size={20} />, color: '#00a8ff', side: 'left' },
@@ -507,7 +510,7 @@ const Landing = () => {
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Left — KavachX */}
                         <div className="rounded-3xl border border-[#00f3ff]/15 overflow-hidden"
-                            style={{ background: 'linear-gradient(160deg, rgba(0,243,255,0.04) 0%, rgba(33,118,255,0.03) 100%)' }}>
+                            style={{ background: 'linear-gradient(160deg, rgba(0,243,255,0.04) 0%, rgba(0,112,255,0.03) 100%)' }}>
                             <div className="px-7 py-5 border-b border-[#00f3ff]/10 flex items-center gap-3">
                                 <div className="h-8 w-8 flex items-center justify-center rounded-lg bg-[#00f3ff]/10 border border-[#00f3ff]/20">
                                     <Shield size={16} className="text-[#00f3ff]" />
