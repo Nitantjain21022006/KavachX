@@ -1,21 +1,10 @@
 services:
-  # Backend Node.js Service
-  - type: web
-    name: kavachx-backend
-    runtime: node
-    rootDir: backend
-    buildCommand: npm install
-    startCommand: npm start
-    envVars:
-      - key: PORT
-        value: 5001
-      - key: NODE_ENV
-        value: production
-
-  # ML Python Service
   - type: web
     name: kavachx-ml
-    runtime: python
+    env: python
     rootDir: ML
-    buildCommand: pip install --upgrade pip && pip install --prefer-binary -r requirements.txt
+    buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.13
