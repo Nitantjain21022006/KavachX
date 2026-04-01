@@ -1,0 +1,13 @@
+flask
+flask-cors
+numpy==1.26.4
+pandas
+scikit-learn
+tensorflow-cpu==2.15.0
+joblib
+matplotlib
+seaborn
+tqdm
+imbalanced-learn
+xgboost
+gunicorn
